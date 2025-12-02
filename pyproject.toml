@@ -18,6 +18,10 @@ dependencies = [
     "langchain-core>=0.3.0",
 ]
 
+[project.scripts]
+dump-turns = "sms_ai.tools:main"
+chat = "sms_ai.cli:main"
+
 [project.optional-dependencies]
 dev = [
     "ruff>=0.6.0",

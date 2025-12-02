@@ -7,7 +7,7 @@ from fastapi import Depends, FastAPI, HTTPException, Request
 from fastapi.responses import JSONResponse, Response
 from sqlalchemy.orm import Session
 
-from .db import SessionLocal, init_db
+from .db import SessionLocal, Turn, init_db
 from .pipeline import handle_message
 from .sms import InboundSms
 
@@ -97,3 +97,34 @@ async def sms_inbound(request: Request, db: Session = Depends(get_db)) -> Respon
 </Response>"""
 
     return Response(content=twiml, media_type="application/xml")
+
+
+@app.get("/admin/turns")
+def admin_turns(limit: int = 50, db: Session = Depends(get_db)) -> JSONResponse:
+    """
+    Very small admin endpoint to inspect recent turns.
+
+    Example:
+      GET /admin/turns
+      GET /admin/turns?limit=10
+    """
+    # Clamp limit to a reasonable range
+    safe_limit = max(1, min(limit, 200))
+    turns = db.query(Turn).order_by(Turn.created_at.desc()).limit(safe_limit).all()
+
+    payload = [
+        {
+            "id": t.id,
+            "phone": t.phone,
+            "created_at": t.created_at,
+            "lang_detected": t.lang_detected,
+            "question_tsn_raw": t.question_tsn_raw,
+            "question_en": t.question_en,
+            "answer_en": t.answer_en,
+            "answer_tsn": t.answer_tsn,
+            "llm_model": t.llm_model,
+            "translation_backend": t.translation_backend,
+        }
+        for t in turns
+    ]
+    return JSONResponse(payload)
