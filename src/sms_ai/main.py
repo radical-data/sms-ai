@@ -1,5 +1,8 @@
 from __future__ import annotations
 
+from collections.abc import Generator
+from contextlib import asynccontextmanager
+
 from fastapi import Depends, FastAPI, HTTPException, Request
 from fastapi.responses import JSONResponse, Response
 from sqlalchemy.orm import Session
@@ -8,11 +11,21 @@ from .db import SessionLocal, init_db
 from .pipeline import handle_message
 from .sms import InboundSms
 
-app = FastAPI(title="sms.ai MVP", version="0.1.0")
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    # Startup: runs once before the app starts serving requests
+    init_db()
+    yield
+    # Shutdown: runs once when the app is shutting down (nothing to do yet)
+
+
+app = FastAPI(title="sms.ai", version="0.1.0", lifespan=lifespan)
 
 # --- DB dependency ---
 
-def get_db() -> Session:
+
+def get_db() -> Generator[Session, None, None]:
     db = SessionLocal()
     try:
         yield db
@@ -20,12 +33,8 @@ def get_db() -> Session:
         db.close()
 
 
-@app.on_event("startup")
-def on_startup() -> None:
-    init_db()
-
-
 # --- Routes ---
+
 
 @app.post("/test/inbound")
 def test_inbound(payload: InboundSms, db: Session = Depends(get_db)) -> JSONResponse:
@@ -74,6 +83,10 @@ async def sms_inbound(request: Request, db: Session = Depends(get_db)) -> Respon
             status_code=400,
             detail="Missing 'From' or 'Body' in webhook payload",
         )
+
+    # After the None check, we know these are strings (not UploadFile)
+    assert isinstance(from_number, str)
+    assert isinstance(body, str)
 
     result = handle_message(db=db, phone=from_number, text=body)
 

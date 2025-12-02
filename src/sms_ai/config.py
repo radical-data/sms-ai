@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 from functools import lru_cache
-
 from pathlib import Path
 
 from pydantic import BaseModel
@@ -15,4 +14,3 @@ class Settings(BaseModel):
 @lru_cache
 def get_settings() -> Settings:
     return Settings()
-

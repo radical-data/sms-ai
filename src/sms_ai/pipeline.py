@@ -30,4 +30,3 @@ def handle_message(db: Session, phone: str, text: str) -> PipelineResult:
     # We'll add 'out' messages and Turns in later milestones.
 
     return PipelineResult(echo_text=echo, message_id=incoming.id)
-
