@@ -15,4 +15,5 @@ repomix.config.json
 repomix-output.xml
 
 # Project
+.env
 sms_ai.db
