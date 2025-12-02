@@ -8,3 +8,11 @@ wheels/
 
 # Virtual environments
 .venv
+
+# Repomix
+repomix.config.json
+.repomixignore
+repomix-output.xml
+
+# Project
+sms_ai.db
