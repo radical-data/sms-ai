@@ -1,0 +1,15 @@
+repos:
+  - repo: https://github.com/astral-sh/ruff-pre-commit
+    rev: v0.14.7  # pin to a stable release
+    hooks:
+      # Lint + autofix. Must run before the formatter.
+      - id: ruff
+        args: [--fix]
+      # Formatter (Black-compatible)
+      - id: ruff-format
+  - repo: https://github.com/RobertCraigie/pyright-python
+    rev: v1.1.407
+    hooks:
+      - id: pyright
+        name: "python · Check types with pyright"
+

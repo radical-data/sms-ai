@@ -13,8 +13,53 @@ dependencies = [
     "python-multipart>=0.0.20",
     "sqlalchemy>=2.0.44",
     "uvicorn>=0.38.0",
+    "pydantic>=2.0.0",
+]
+
+[project.optional-dependencies]
+dev = [
+    "ruff>=0.6.0",
+    "pyright[nodejs]>=1.1.400",
+    "pydantic>=2.0.0",
+    "pytest>=8.0.0",
+    "pytest-asyncio>=0.23.0",
+    "httpx>=0.27.0",
+    "pre-commit>=4.0.0",
 ]
 
 [build-system]
 requires = ["uv_build>=0.9.4,<0.10.0"]
 build-backend = "uv_build"
+
+[tool.ruff]
+line-length = 100
+target-version = "py312"
+src = ["src", "tests"]
+
+[tool.ruff.lint]
+# E, F: flake8-style errors
+# B: bugbear, UP: pyupgrade, SIM: simplify, I: import sorting
+select = ["E", "F", "UP", "B", "SIM", "I"]
+ignore = [
+    "E501",  # let the formatter handle line length
+    "B008",  # FastAPI Depends() pattern is standard
+]
+
+[tool.ruff.format]
+quote-style = "double"
+indent-style = "space"
+docstring-code-format = true
+
+[tool.pyright]
+include = ["src", "tests"]
+exclude = ["**/__pycache__"]
+venvPath = "."
+venv = ".venv"
+pythonVersion = "3.12"
+typeCheckingMode = "strict"
+reportMissingTypeStubs = false
+
+[tool.pytest.ini_options]
+addopts = "-ra"
+testpaths = ["tests"]
+python_files = ["test_*.py"]
