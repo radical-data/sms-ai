@@ -1,0 +1,17 @@
+[project]
+name = "sms-ai"
+version = "0.1.0"
+description = "Add your description here"
+readme = "README.md"
+authors = [
+    { name = "Jo Kroese" }
+]
+requires-python = ">=3.12"
+dependencies = []
+
+[project.scripts]
+sms-ai = "sms_ai:main"
+
+[build-system]
+requires = ["uv_build>=0.9.4,<0.10.0"]
+build-backend = "uv_build"
