@@ -22,6 +22,7 @@ dependencies = [
 [project.scripts]
 dump-turns = "sms_ai.tools:main"
 chat = "sms_ai.cli:main"
+debug-glossary = "sms_ai.debug:main"
 
 [project.optional-dependencies]
 dev = [

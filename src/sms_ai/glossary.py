@@ -7,8 +7,11 @@ from collections.abc import Iterable
 from dataclasses import dataclass
 from functools import lru_cache
 from pathlib import Path
+from typing import Literal
 
 from .config import get_settings
+
+LangCode = Literal["en", "tsn"]
 
 try:
     from rapidfuzz import fuzz
@@ -201,6 +204,36 @@ def _match_tokens(
     return _unique(matches)[:max_terms]
 
 
+def _entries_for_token(
+    token: str,
+    *,
+    source: LangCode,
+) -> list[GlossaryEntry]:
+    """
+    Return glossary entries that match a single *normalised* token
+    for the given source language, using the same logic as _match_tokens.
+    """
+    idx = get_glossary_index()
+
+    if source == "tsn":
+        index_map = idx.tsn_index
+        all_forms = idx.tsn_forms
+    elif source == "en":
+        index_map = idx.en_index
+        all_forms = idx.en_forms
+    else:
+        raise ValueError(f"Unsupported source language: {source}")
+
+    # Reuse _match_tokens, but with only this one token
+    # Use a very high max_terms so we effectively don't limit per token
+    return _match_tokens(
+        tokens=[token],
+        index_map=index_map,
+        all_forms=all_forms,
+        max_terms=999,
+    )
+
+
 def find_terms_for_tsn(text: str, max_terms: int = 30) -> list[GlossaryEntry]:
     """Find relevant glossary entries for Setswana source text."""
     idx = get_glossary_index()
@@ -213,3 +246,60 @@ def find_terms_for_en(text: str, max_terms: int = 30) -> list[GlossaryEntry]:
     idx = get_glossary_index()
     tokens = _tokenise(text)
     return _match_tokens(tokens, idx.en_index, idx.en_forms, max_terms=max_terms)
+
+
+def preview_matches_for_text(
+    text: str,
+    source: LangCode,
+) -> list[dict[str, object]]:
+    """
+    Debug helper: for a given text and source language, return a list of
+    per-token matches:
+
+      {
+        "token": original_token_from_text,
+        "normalised_token": normalised_form,
+        "entries": [
+          {
+            "english_label": ...,
+            "english_pos": ...,
+            "setswana_preferred": ...,
+            "setswana_variants": [...],
+            "setswana_pos": ...,
+          },
+          ...
+        ],
+      }
+
+    Only tokens that have at least one glossary match are included.
+    """
+    results: list[dict[str, object]] = []
+
+    # Use WORD_RE directly so we can keep the original surface form,
+    # then normalise it for lookup.
+    for match in WORD_RE.finditer(text):
+        raw_token = match.group(0)
+        normalised = _normalise(raw_token)
+
+        entries = _entries_for_token(normalised, source=source)
+        if not entries:
+            continue
+
+        results.append(
+            {
+                "token": raw_token,
+                "normalised_token": normalised,
+                "entries": [
+                    {
+                        "english_label": e.english_label,
+                        "english_pos": e.english_pos,
+                        "setswana_preferred": e.setswana_preferred,
+                        "setswana_variants": list(e.setswana_variants),
+                        "setswana_pos": e.setswana_pos,
+                    }
+                    for e in entries
+                ],
+            }
+        )
+
+    return results
