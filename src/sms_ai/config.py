@@ -23,6 +23,11 @@ class Settings(BaseModel):
     # If None, we default to data/glossary.csv under project root.
     glossary_csv: Path | None = None
 
+    # --- Twilio settings for async outbound SMS ---
+    twilio_account_sid: str | None = os.getenv("TWILIO_ACCOUNT_SID")
+    twilio_auth_token: str | None = os.getenv("TWILIO_AUTH_TOKEN")
+    twilio_from_number: str | None = os.getenv("TWILIO_FROM_NUMBER")
+
     def model_post_init(self, __context: object) -> None:  # type: ignore[override]
         env_path = os.getenv("GLOSSARY_CSV_PATH")
         if env_path:

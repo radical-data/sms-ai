@@ -18,6 +18,7 @@ dependencies = [
     "rapidfuzz>=3.0.0",
     "langchain-google-genai>=4.0.0",
     "langchain-tavily>=0.1.0",
+    "twilio>=9.0.0",
 ]
 
 [project.scripts]
