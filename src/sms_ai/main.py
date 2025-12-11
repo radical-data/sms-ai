@@ -24,7 +24,10 @@ async def lifespan(app: FastAPI):
 
 app = FastAPI(title="sms.ai", version="0.1.0", lifespan=lifespan)
 
-BASE_DIR = Path(__file__).resolve().parents[2]
+# Project root:
+# - In local dev: inferred from the src/ layout.
+# - In Docker: overridden by PROJECT_ROOT env var (set to /app in the Dockerfile).
+BASE_DIR = Path(os.getenv("PROJECT_ROOT", Path(__file__).resolve().parents[2]))
 DEMO_HTML_PATH = BASE_DIR / "static" / "demo.html"
 
 # --- Admin protection ---

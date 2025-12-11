@@ -6,7 +6,8 @@ ENV PYTHONDONTWRITEBYTECODE=1 \
     PYTHONUNBUFFERED=1 \
     PIP_NO_CACHE_DIR=1 \
     # Default DB location inside the container (overrides config.py default)
-    DATABASE_URL=sqlite:////app/data/sms_ai.db
+    DATABASE_URL=sqlite:////app/data/sms_ai.db \
+    PROJECT_ROOT=/app
 
 # Where the app lives in the container
 WORKDIR /app
