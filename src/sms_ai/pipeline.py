@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import re
 from collections.abc import Mapping
 from dataclasses import dataclass
 from typing import Any, Final
@@ -13,26 +14,67 @@ from .db import Message, Turn
 MAX_SMS_CHARS: Final[int] = 320
 
 
+def normalise_sms_text(text: str) -> str:
+    """
+    Make SMS text plain and compact:
+
+    - Strip very simple markdown like **bold** and __bold__.
+    - Remove leading bullet markers (-, *, •) at the start of lines.
+    - Collapse all whitespace and line breaks to single spaces.
+    """
+    # Remove basic bold/underline markdown markers but keep the inner text.
+    text = re.sub(r"\*\*(.*?)\*\*", r"\1", text)
+    text = re.sub(r"__(.*?)__", r"\1", text)
+
+    # Split on lines so we can drop bullet markers.
+    lines = text.splitlines()
+    cleaned_lines: list[str] = []
+    for line in lines:
+        # Strip leading bullets like "- ", "* ", "• "
+        cleaned_line = re.sub(r"^\s*[-*•]+\s*", "", line)
+        cleaned_lines.append(cleaned_line)
+
+    # Join lines with spaces and collapse any remaining whitespace.
+    text = " ".join(cleaned_lines)
+    text = re.sub(r"\s+", " ", text)
+    return text.strip()
+
+
 def clamp_sms(text: str) -> str:
     """
     Ensure the SMS body is not excessively long.
 
     We aim for roughly <= 2 GSM-7 SMS segments (~160 chars each).
 
-    If it's longer, we truncate and add a short continuation hint in Setswana.
+    If it's longer, we try to cut at a sentence boundary and then add
+    a short continuation hint in Setswana.
     """
     if len(text) <= MAX_SMS_CHARS:
         return text
 
-    tail = " Go na le tshedimosetso e nngwe, kopa tswelela o botse gape."
+    # Shorter Setswana tail to reduce noise in the SMS.
+    tail = " Karabo e khutshwane; o ka botsa gape gore re tlhalose."
 
     # If the tail itself is longer than the budget, hard-cut the text.
     if len(tail) >= MAX_SMS_CHARS:
         return text[:MAX_SMS_CHARS].rstrip()
 
+    # Reserve space for the tail.
     allowed = MAX_SMS_CHARS - len(tail)
-    truncated = text[:allowed].rstrip()
-    return truncated + tail
+    base = text[:allowed].rstrip()
+
+    # Try to avoid truncating in the middle of a sentence:
+    # look for the last sentence-ending punctuation within `base`.
+    last_full_stop = base.rfind(".")
+    last_exclam = base.rfind("!")
+    last_question = base.rfind("?")
+    cut_idx = max(last_full_stop, last_exclam, last_question)
+
+    if cut_idx != -1:
+        # Keep everything up to and including the punctuation mark.
+        base = base[: cut_idx + 1].rstrip()
+
+    return base + tail
 
 
 def maybe_add_warning(answer_en: str, answer_tsn: str, safety_flags: Mapping[str, Any]) -> str:
@@ -113,6 +155,10 @@ def handle_message(db: Session, phone: str, text: str) -> PipelineResult:
         # For English or "other", we currently just send the final answer as-is.
         answer_for_user = final_answer
 
+    # Clean up markdown / bullets / whitespace for SMS.
+    answer_for_user = normalise_sms_text(answer_for_user)
+
+    # Then enforce the 320-char limit with a short Setswana tail.
     answer_for_user = clamp_sms(answer_for_user)
 
     # 5. Save outgoing message
