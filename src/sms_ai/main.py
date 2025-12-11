@@ -1,10 +1,11 @@
 from __future__ import annotations
 
+import os
 from collections.abc import Generator
 from contextlib import asynccontextmanager
 
-from fastapi import Depends, FastAPI, HTTPException, Request
-from fastapi.responses import JSONResponse, Response
+from fastapi import Depends, FastAPI, Form, HTTPException, Request, Response
+from fastapi.responses import JSONResponse
 from sqlalchemy.orm import Session
 
 from .db import SessionLocal, Turn, init_db
@@ -21,6 +22,32 @@ async def lifespan(app: FastAPI):
 
 
 app = FastAPI(title="sms.ai", version="0.1.0", lifespan=lifespan)
+
+# --- Admin protection ---
+
+ADMIN_TOKEN = os.getenv("ADMIN_TOKEN")
+ALLOWED_ADMIN_IPS = {"127.0.0.1", "::1"}
+
+
+def verify_admin(request: Request) -> None:
+    """
+    Simple protection for /admin endpoints:
+    - only allow requests from ALLOWED_ADMIN_IPS
+    - require X-Admin-Token header that matches ADMIN_TOKEN env var
+    """
+    client_host = request.client.host if request.client else None
+
+    if client_host not in ALLOWED_ADMIN_IPS:
+        raise HTTPException(status_code=403, detail="Forbidden")
+
+    if not ADMIN_TOKEN:
+        # Misconfiguration; safer to refuse access than to expose data.
+        raise HTTPException(status_code=500, detail="ADMIN_TOKEN not configured")
+
+    header_token = request.headers.get("X-Admin-Token")
+    if header_token != ADMIN_TOKEN:
+        raise HTTPException(status_code=401, detail="Invalid admin token")
+
 
 # --- DB dependency ---
 
@@ -58,7 +85,11 @@ def test_inbound(payload: InboundSms, db: Session = Depends(get_db)) -> JSONResp
 
 
 @app.post("/sms/inbound")
-async def sms_inbound(request: Request, db: Session = Depends(get_db)) -> Response:
+def sms_inbound(
+    From_: str = Form(..., alias="From"),
+    Body: str = Form(..., alias="Body"),
+    db: Session = Depends(get_db),
+) -> Response:
     """
     Twilio-style SMS webhook endpoint.
 
@@ -69,24 +100,12 @@ async def sms_inbound(request: Request, db: Session = Depends(get_db)) -> Respon
           Body: the SMS text
 
     We:
-      - read those values
+      - read those values (parsed by FastAPI from the form body)
       - pass them to handle_message(...)
       - return a TwiML XML response with the echo text
     """
-    form = await request.form()
-    from_number = form.get("From")
-    body = form.get("Body")
-
-    if not from_number or not body:
-        # This should not happen under normal Twilio usage
-        raise HTTPException(
-            status_code=400,
-            detail="Missing 'From' or 'Body' in webhook payload",
-        )
-
-    # After the None check, we know these are strings (not UploadFile)
-    assert isinstance(from_number, str)
-    assert isinstance(body, str)
+    from_number = From_
+    body = Body
 
     result = handle_message(db=db, phone=from_number, text=body)
 
@@ -100,7 +119,11 @@ async def sms_inbound(request: Request, db: Session = Depends(get_db)) -> Respon
 
 
 @app.get("/admin/turns")
-def admin_turns(limit: int = 50, db: Session = Depends(get_db)) -> JSONResponse:
+def admin_turns(
+    limit: int = 50,
+    db: Session = Depends(get_db),
+    _: None = Depends(verify_admin),
+) -> JSONResponse:
     """
     Very small admin endpoint to inspect recent turns.
 
