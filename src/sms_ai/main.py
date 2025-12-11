@@ -5,13 +5,14 @@ from collections.abc import Generator
 from contextlib import asynccontextmanager
 from pathlib import Path
 
-from fastapi import Depends, FastAPI, Form, HTTPException, Request, Response
+from fastapi import BackgroundTasks, Depends, FastAPI, Form, HTTPException, Request, Response
 from fastapi.responses import FileResponse, JSONResponse
 from sqlalchemy.orm import Session
 
-from .db import SessionLocal, Turn, init_db
-from .pipeline import handle_message
+from .db import Message, SessionLocal, Turn, init_db
+from .pipeline import handle_message, process_existing_incoming_message
 from .sms import InboundSms
+from .twilio_client import send_sms
 
 
 @asynccontextmanager
@@ -70,6 +71,30 @@ def get_db() -> Generator[Session, None, None]:
 # --- Routes ---
 
 
+def process_and_reply_async(message_id: int, to_number: str) -> None:
+    """
+    Background task:
+
+    - open a fresh DB session
+    - load the existing incoming Message by id
+    - run the pipeline
+    - send the SMS via Twilio REST API
+    """
+    db = SessionLocal()
+    try:
+        incoming = db.query(Message).filter(Message.id == message_id).first()
+        if incoming is None:
+            # Nothing to do (message missing)
+            return
+
+        result = process_existing_incoming_message(db=db, incoming=incoming)
+    finally:
+        db.close()
+
+    # send the SMS after we've closed the DB session
+    send_sms(to=to_number, body=result.echo_text)
+
+
 @app.get("/")
 def demo_page() -> FileResponse:
     """
@@ -106,34 +131,34 @@ def test_inbound(payload: InboundSms, db: Session = Depends(get_db)) -> JSONResp
 
 @app.post("/sms/inbound")
 def sms_inbound(
+    background_tasks: BackgroundTasks,
     From_: str = Form(..., alias="From"),
     Body: str = Form(..., alias="Body"),
     db: Session = Depends(get_db),
 ) -> Response:
     """
-    Twilio-style SMS webhook endpoint.
+    Twilio-style SMS webhook endpoint (async version).
 
-    For now we test this locally by mimicking Twilio:
-      - Content-Type: application/x-www-form-urlencoded
-      - Fields:
-          From: the sender's phone number
-          Body: the SMS text
-
-    We:
-      - read those values (parsed by FastAPI from the form body)
-      - pass them to handle_message(...)
-      - return a TwiML XML response with the echo text
+    Behaviour:
+      - store the incoming message
+      - schedule background processing + outbound SMS via Twilio
+      - immediately return empty TwiML so Twilio does NOT send an auto-reply
     """
     from_number = From_
     body = Body
 
-    result = handle_message(db=db, phone=from_number, text=body)
+    # Store incoming message
+    incoming = Message(phone=from_number, direction="in", text=body)
+    db.add(incoming)
+    db.commit()
+    db.refresh(incoming)
 
-    # TwiML XML response. Later Twilio will send this back as an SMS.
-    twiml = f"""<?xml version="1.0" encoding="UTF-8"?>
-<Response>
-  <Message>{result.echo_text}</Message>
-</Response>"""
+    # Schedule async processing + SMS send
+    background_tasks.add_task(process_and_reply_async, incoming.id, from_number)
+
+    # 3. Return empty TwiML so Twilio is satisfied but sends no immediate SMS
+    twiml = """<?xml version="1.0" encoding="UTF-8"?>
+<Response></Response>"""
 
     return Response(content=twiml, media_type="application/xml")
 

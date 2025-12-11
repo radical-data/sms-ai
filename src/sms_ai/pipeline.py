@@ -106,19 +106,17 @@ class PipelineResult:
     message_id: int
 
 
-def handle_message(db: Session, phone: str, text: str) -> PipelineResult:
+def process_existing_incoming_message(db: Session, incoming: Message) -> PipelineResult:
     """
-    New core business logic:
-    - stores the incoming message
-    - calls the agent (single LLM call)
-    - uses the agent's structured output to save a Turn
-    - returns the answer in the user's language as echo_text
+    Core pipeline logic assuming the incoming Message is already stored.
+
+    Used by:
+      - synchronous HTTP endpoints (/test/inbound)
+      - async Twilio worker (background task)
+      - CLI, etc.
     """
-    # 1. Save incoming message (raw text)
-    incoming = Message(phone=phone, direction="in", text=text)
-    db.add(incoming)
-    db.commit()
-    db.refresh(incoming)
+    text = incoming.text
+    phone = incoming.phone
 
     # 2. Call the agent
     agent_result = run_agent(text)
@@ -185,5 +183,20 @@ def handle_message(db: Session, phone: str, text: str) -> PipelineResult:
     db.add(turn)
     db.commit()
 
-    # 7. Return answer for endpoints to send via SMS/HTTP
+    # 7. Return answer for endpoints / worker to send via SMS/HTTP
     return PipelineResult(echo_text=answer_for_user, message_id=incoming.id)
+
+
+def handle_message(db: Session, phone: str, text: str) -> PipelineResult:
+    """
+    Wrapper used by synchronous callers.
+
+    - stores the incoming message
+    - delegates to process_existing_incoming_message(...)
+    """
+    incoming = Message(phone=phone, direction="in", text=text)
+    db.add(incoming)
+    db.commit()
+    db.refresh(incoming)
+
+    return process_existing_incoming_message(db=db, incoming=incoming)
