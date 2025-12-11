@@ -124,6 +124,8 @@ def admin_turns(limit: int = 50, db: Session = Depends(get_db)) -> JSONResponse:
             "answer_tsn": t.answer_tsn,
             "llm_model": t.llm_model,
             "translation_backend": t.translation_backend,
+            "reasoning_summary": t.reasoning_summary,
+            "safety_flags_json": t.safety_flags_json,
         }
         for t in turns
     ]

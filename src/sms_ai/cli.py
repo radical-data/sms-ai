@@ -1,9 +1,6 @@
 from __future__ import annotations
 
-import argparse
-
 from .db import SessionLocal
-from .llm import ask_llm
 from .pipeline import handle_message
 
 CLI_TS_PHONE = "+999000000_tswana_cli"
@@ -35,40 +32,8 @@ def chat_tsn() -> None:
         db.close()
 
 
-def chat_en() -> None:
-    """
-    Interactive CLI chat in English, directly against the LLM.
-
-    This bypasses translation and does NOT log to the database.
-    """
-    print("English CLI mode (direct LLM, no DB). Type /quit to exit.\n")
-    while True:
-        try:
-            user_input = input("en> ").strip()
-        except (EOFError, KeyboardInterrupt):
-            print()
-            break
-        if not user_input:
-            continue
-        if user_input.lower() in {"/q", "/quit", "/exit"}:
-            break
-        answer = ask_llm(user_input)
-        print(f"bot> {answer}\n")
-
-
 def main() -> None:
-    parser = argparse.ArgumentParser(description="sms-ai CLI tools (chat in Tswana or English).")
-    parser.add_argument(
-        "mode",
-        choices=["tsn", "en"],
-        help="Chat mode: 'tsn' (Tswana pipeline) or 'en' (direct English LLM).",
-    )
-    args = parser.parse_args()
-
-    if args.mode == "tsn":
-        chat_tsn()
-    else:
-        chat_en()
+    chat_tsn()
 
 
 if __name__ == "__main__":
