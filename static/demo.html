@@ -1,0 +1,249 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>sms-ai demo</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <style>
+    :root {
+      font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      background: #f2f2f7;
+      color: #111827;
+    }
+    body {
+      margin: 0;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      height: 100vh;
+    }
+    .phone-frame {
+      width: 360px;
+      max-width: 100%;
+      height: 640px;
+      max-height: 100%;
+      border-radius: 24px;
+      box-shadow: 0 20px 40px rgba(0, 0, 0, 0.15);
+      background: #000;
+      padding: 10px;
+      box-sizing: border-box;
+      display: flex;
+      flex-direction: column;
+      position: relative;
+    }
+    .screen {
+      flex: 1;
+      background: #f2f2f7;
+      border-radius: 18px;
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+    }
+    .header {
+      padding: 10px 16px;
+      border-bottom: 1px solid rgba(0,0,0,0.06);
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      background: #f9fafb;
+    }
+    .header-title {
+      font-weight: 600;
+      font-size: 14px;
+    }
+    .header-subtitle {
+      font-size: 11px;
+      color: #6b7280;
+    }
+    .status-dot {
+      width: 8px;
+      height: 8px;
+      border-radius: 999px;
+      background: #22c55e;
+    }
+    .chat {
+      flex: 1;
+      padding: 8px 10px 12px;
+      overflow-y: auto;
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+    }
+    .bubble-row {
+      display: flex;
+      width: 100%;
+    }
+    .bubble-row.user {
+      justify-content: flex-end;
+    }
+    .bubble-row.bot {
+      justify-content: flex-start;
+    }
+    .bubble {
+      max-width: 80%;
+      padding: 6px 9px;
+      border-radius: 14px;
+      font-size: 13px;
+      line-height: 1.4;
+      word-wrap: break-word;
+      white-space: pre-wrap;
+    }
+    .bubble.user {
+      background: #0b93f6;
+      color: #fff;
+      border-bottom-right-radius: 4px;
+    }
+    .bubble.bot {
+      background: #e5e5ea;
+      color: #111827;
+      border-bottom-left-radius: 4px;
+    }
+    .input-bar {
+      padding: 8px;
+      border-top: 1px solid rgba(0,0,0,0.06);
+      display: flex;
+      gap: 6px;
+      background: #f9fafb;
+    }
+    .input-bar input[type="text"] {
+      flex: 1;
+      border-radius: 999px;
+      border: 1px solid #d1d5db;
+      padding: 7px 10px;
+      font-size: 13px;
+      outline: none;
+      background: #fff;
+    }
+    .input-bar input[type="text"]:focus {
+      border-color: #0b93f6;
+    }
+    .input-bar button {
+      border-radius: 999px;
+      border: none;
+      padding: 7px 12px;
+      font-size: 13px;
+      cursor: pointer;
+      background: #0b93f6;
+      color: #fff;
+      font-weight: 500;
+    }
+    .input-bar button:disabled {
+      opacity: 0.5;
+      cursor: not-allowed;
+    }
+    .phone-meta {
+      position: absolute;
+      left: 16px;
+      bottom: 16px;
+      font-size: 11px;
+      color: rgba(255,255,255,0.6);
+    }
+  </style>
+</head>
+<body>
+  <div class="phone-frame">
+    <div class="screen">
+      <div class="header">
+        <div class="status-dot"></div>
+        <div>
+          <div class="header-title">sms-ai</div>
+          <div class="header-subtitle">Demo chat (web, not real SMS)</div>
+        </div>
+      </div>
+      <div id="chat" class="chat"></div>
+      <form id="chat-form" class="input-bar" autocomplete="off">
+        <input
+          id="message-input"
+          type="text"
+          placeholder="Type a message…"
+          required
+        />
+        <button id="send-btn" type="submit">Send</button>
+      </form>
+    </div>
+    <div id="phone-meta" class="phone-meta"></div>
+  </div>
+
+  <script>
+    // Generate or reuse a pseudo-phone ID so that all requests from this browser
+    // are grouped together in the backend.
+    const STORAGE_KEY = "sms_ai_demo_phone";
+    let demoPhone = localStorage.getItem(STORAGE_KEY);
+    if (!demoPhone) {
+      const randomId = Math.floor(Math.random() * 1e9).toString().padStart(9, "0");
+      demoPhone = "+999" + randomId;  // clearly non-real country code
+      localStorage.setItem(STORAGE_KEY, demoPhone);
+    }
+
+    const phoneMeta = document.getElementById("phone-meta");
+    phoneMeta.textContent = "Demo phone: " + demoPhone + " (simulated)";
+
+    const chatEl = document.getElementById("chat");
+    const formEl = document.getElementById("chat-form");
+    const inputEl = document.getElementById("message-input");
+    const sendBtn = document.getElementById("send-btn");
+
+    function addMessage(text, who) {
+      const row = document.createElement("div");
+      row.className = "bubble-row " + who;
+
+      const bubble = document.createElement("div");
+      bubble.className = "bubble " + who;
+      bubble.textContent = text;
+
+      row.appendChild(bubble);
+      chatEl.appendChild(row);
+      chatEl.scrollTop = chatEl.scrollHeight;
+    }
+
+    function setLoading(isLoading) {
+      inputEl.disabled = isLoading;
+      sendBtn.disabled = isLoading;
+      sendBtn.textContent = isLoading ? "…" : "Send";
+    }
+
+    formEl.addEventListener("submit", async (event) => {
+      event.preventDefault();
+      const text = inputEl.value.trim();
+      if (!text) return;
+
+      addMessage(text, "user");
+      inputEl.value = "";
+      setLoading(true);
+
+      try {
+        const resp = await fetch("/test/inbound", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json"
+          },
+          body: JSON.stringify({
+            phone: demoPhone,
+            text: text
+          })
+        });
+
+        if (!resp.ok) {
+          addMessage("Error from server: " + resp.status, "bot");
+          return;
+        }
+
+        const data = await resp.json();
+        if (data && typeof data.echo === "string") {
+          addMessage(data.echo, "bot");
+        } else {
+          addMessage("Unexpected response.", "bot");
+        }
+      } catch (err) {
+        console.error(err);
+        addMessage("Network error – check the backend.", "bot");
+      } finally {
+        setLoading(false);
+      }
+    });
+
+    // Initial message so the screen isn't empty.
+    addMessage("This is a web demo that uses the same engine as SMS, but no real airtime is used.", "bot");
+  </script>
+</body>
+</html>

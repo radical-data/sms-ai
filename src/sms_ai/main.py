@@ -3,9 +3,10 @@ from __future__ import annotations
 import os
 from collections.abc import Generator
 from contextlib import asynccontextmanager
+from pathlib import Path
 
 from fastapi import Depends, FastAPI, Form, HTTPException, Request, Response
-from fastapi.responses import JSONResponse
+from fastapi.responses import FileResponse, JSONResponse
 from sqlalchemy.orm import Session
 
 from .db import SessionLocal, Turn, init_db
@@ -22,6 +23,9 @@ async def lifespan(app: FastAPI):
 
 
 app = FastAPI(title="sms.ai", version="0.1.0", lifespan=lifespan)
+
+BASE_DIR = Path(__file__).resolve().parents[2]
+DEMO_HTML_PATH = BASE_DIR / "static" / "demo.html"
 
 # --- Admin protection ---
 
@@ -61,6 +65,19 @@ def get_db() -> Generator[Session, None, None]:
 
 
 # --- Routes ---
+
+
+@app.get("/")
+def demo_page() -> FileResponse:
+    """
+    Web demo page that mimics the SMS UI.
+
+    Notes:
+    - Uses a fake phone number stored in localStorage.
+    - Sends JSON requests to /test/inbound.
+    - Does NOT use Twilio or /sms/inbound.
+    """
+    return FileResponse(DEMO_HTML_PATH)
 
 
 @app.post("/test/inbound")
