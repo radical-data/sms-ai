@@ -6,6 +6,7 @@ from sqlalchemy import (
     DateTime,
     Integer,
     String,
+    Text,
     create_engine,
 )
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, sessionmaker
@@ -47,6 +48,8 @@ class Turn(Base):
     answer_tsn: Mapped[str | None] = mapped_column(String, nullable=True)
     llm_model: Mapped[str | None] = mapped_column(String, nullable=True)
     translation_backend: Mapped[str | None] = mapped_column(String, nullable=True)
+    reasoning_summary: Mapped[str | None] = mapped_column(Text, nullable=True)
+    safety_flags_json: Mapped[str | None] = mapped_column(Text, nullable=True)
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), default=utcnow, nullable=False
     )

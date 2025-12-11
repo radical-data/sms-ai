@@ -8,11 +8,16 @@ from pydantic import BaseModel
 
 
 class Settings(BaseModel):
-    # Project root
+    # Project root (repo root in local dev, /app in Docker)
     project_root: Path = Path(__file__).resolve().parents[2]
 
-    # SQLite file in project root by default
-    database_url: str = f"sqlite:///{(Path(__file__).resolve().parents[2] / 'sms_ai.db')}"
+    # Database URL:
+    # - Default for local dev: sqlite file in the project root (sms_ai.db)
+    # - Override in Docker / production using the DATABASE_URL env var
+    database_url: str = os.getenv(
+        "DATABASE_URL",
+        f"sqlite:///{(Path(__file__).resolve().parents[2] / 'sms_ai.db')}",
+    )
 
     # Optional glossary CSV path (can be overridden by env var)
     # If None, we default to data/glossary.csv under project root.

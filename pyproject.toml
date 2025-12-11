@@ -14,9 +14,10 @@ dependencies = [
     "sqlalchemy>=2.0.44",
     "uvicorn>=0.38.0",
     "pydantic>=2.0.0",
-    "langchain-openai>=1.1.0",
     "langchain-core>=0.3.0",
     "rapidfuzz>=3.0.0",
+    "langchain-google-genai>=4.0.0",
+    "langchain-tavily>=0.1.0",
 ]
 
 [project.scripts]
