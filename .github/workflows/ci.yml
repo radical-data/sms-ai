@@ -2,28 +2,37 @@ name: CI
 
 on:
   push:
-    branches: [ main ]
+    branches: [main]
   pull_request:
+
+permissions:
+  contents: read
 
 jobs:
   test:
     runs-on: ubuntu-latest
-
     steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-
-      - name: Install uv
-        uses: astral-sh/setup-uv@v3
-
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+      - uses: astral-sh/setup-uv@1c37ad07a6a961277cf70c0d37d6f313000f5884 # v10.3.0
+        with:
+          enable-cache: true
       - name: Sync dependencies
-        run: uv sync --all-extras --dev
-
+        run: uv sync --locked --all-extras
       - name: Lint
-        run: uv run ruff check .
-
+        run: uv run --locked ruff check .
       - name: Type check
-        run: uv run pyright
-
+        run: uv run --locked pyright
       - name: Tests
-        run: uv run pytest
+        run: uv run --locked pytest
+
+  container:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+      - name: Build production image
+        run: docker build --tag sms-ai:ci .
+      - name: Check application startup and demo page
+        run: |
+          docker run --detach --name sms-ai-ci --publish 8000:8000 sms-ai:ci
+          trap 'docker logs sms-ai-ci; docker rm --force sms-ai-ci' EXIT
+          curl --fail --retry 10 --retry-connrefused --retry-delay 2 http://localhost:8000/
