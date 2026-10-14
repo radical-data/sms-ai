@@ -175,7 +175,7 @@ def process_existing_incoming_message(db: Session, incoming: Message) -> Pipelin
         question_en=question_en,
         answer_en=answer_en,
         answer_tsn=answer_tsn,
-        llm_model="gemini-3-pro-preview",
+        llm_model="gemini-3.1-pro-preview",
         translation_backend="gemini3:tavily-single-call",
         reasoning_summary=reasoning_summary,
         safety_flags_json=json.dumps(safety_flags),
