@@ -120,7 +120,7 @@ def get_agent_model() -> ChatGoogleGenerativeAI:
     global _agent_model
     if _agent_model is None:
         _agent_model = ChatGoogleGenerativeAI(
-            model="gemini-3-pro-preview",
+            model="gemini-3.1-pro-preview",
             # Lower temperature than the Gemini 3 default to keep answers stable.
             temperature=0.4,
             max_tokens=None,

@@ -4,20 +4,25 @@ import os
 
 import pytest
 from fastapi.testclient import TestClient
+from sqlalchemy.orm import Session, sessionmaker
 
 from sms_ai.main import app
 
-# Skip this module if no API key is configured (avoids flaky CI without secrets)
-if not os.environ.get("GOOGLE_API_KEY"):
-    pytest.skip("GOOGLE_API_KEY not set, skipping LLM smoke test", allow_module_level=True)
+# Live provider calls are opt-in, even when a local .env contains API keys.
+if os.environ.get("RUN_LIVE_TESTS") != "1":
+    pytest.skip("Set RUN_LIVE_TESTS=1 to run live provider tests", allow_module_level=True)
+
+# Both providers must be configured.
+if not all(os.environ.get(key) for key in ("GOOGLE_API_KEY", "TAVILY_API_KEY")):
+    pytest.skip("Provider keys not set, skipping LLM smoke test", allow_module_level=True)
 
 
-def test_health_inbound_test_endpoint() -> None:
-    client = TestClient(app)
-    resp = client.post(
-        "/test/inbound",
-        json={"phone": "+27123456789", "text": "Hello"},
-    )
+def test_health_inbound_test_endpoint(database: sessionmaker[Session]) -> None:
+    with TestClient(app) as client:
+        resp = client.post(
+            "/test/inbound",
+            json={"phone": "+27123456789", "text": "Hello"},
+        )
     assert resp.status_code == 200
     data = resp.json()
     assert data["status"] == "ok"
