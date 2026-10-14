@@ -27,6 +27,7 @@ jobs:
 
   container:
     runs-on: ubuntu-latest
+    timeout-minutes: 5
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
       - name: Build production image
@@ -35,4 +36,7 @@ jobs:
         run: |
           docker run --detach --name sms-ai-ci --publish 8000:8000 sms-ai:ci
           trap 'docker logs sms-ai-ci; docker rm --force sms-ai-ci' EXIT
-          curl --fail --retry 10 --retry-connrefused --retry-delay 2 http://localhost:8000/
+          # Docker can reset connections before Uvicorn starts listening.
+          curl --fail --silent --show-error --output /dev/null \
+            --retry 15 --retry-all-errors --retry-delay 2 --retry-max-time 60 \
+            --connect-timeout 2 --max-time 5 http://localhost:8000/
